@@ -15,10 +15,5 @@
 //= require handlebars
 //= require ember
 //= require ember-data
+//= require ember_app/manifest
 //= require_self
-//= require dynatree_ember_exercise
-
-// for more details see: http://emberjs.com/guides/application/
-DynatreeEmberExercise = Ember.Application.create();
-
-//= require_tree .
