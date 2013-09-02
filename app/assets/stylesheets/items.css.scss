@@ -1,8 +1,14 @@
-#items-container {
+div#items-container {
+  $height: 400px;
   overflow: hidden;
-  height: 600px;
-  .items-tree {
-    width: 400px;
-    height: 98%;
+  height: $height;
+  .items-tree{
+    overflow: hidden;
+    float: left;
+    width: 30%;
+  }
+  div#item {
+    float: right;
+    width: 70%;
   }
 }

@@ -27,3 +27,4 @@ EmberApp.DynatreeView = Ember.View.extend
           that.get('controller').transitionToRoute("items")
         else
           that.get('controller').transitionToRoute("item", key)
+      clickFolderMode: 1 # Activate, don't expand
