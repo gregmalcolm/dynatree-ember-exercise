@@ -23,4 +23,4 @@ EmberApp.DynatreeView = Ember.View.extend
         url: "/items/tree.json"
       onActivate: (node, event) ->
         key = node.data.key
-        that.get('controller').transitionToRoute("items")
+        that.get('controller').transitionToRoute("item", key)
