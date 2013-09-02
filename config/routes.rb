@@ -1,5 +1,5 @@
 DynatreeEmberExercise::Application.routes.draw do
-  resources :items do
+  resource :items do
     get "tree"
   end
 
