@@ -1,7 +1,23 @@
 EmberApp = window.EmberApp
 
 EmberApp.DynatreeView = Ember.View.extend
-  tagName: 'div'
+  events: []
+  attributes: []
+
   classNames: 'items-tree'
   didInsertElement: ->
-    console.log @$().dynatree()
+    opt = {}
+    that = @
+
+    @get('events').forEach ->
+      callback = that[event]
+      if callback
+        opt[event] = callback
+
+    @get('attributes').forEach (attr) ->
+      if that[attr]?
+        opt[attr] = that[attr]
+
+    @$().dynatree
+      initAjax:
+        url: "/items/tree.json"
