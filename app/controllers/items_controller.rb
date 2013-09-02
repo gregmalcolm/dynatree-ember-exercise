@@ -6,8 +6,8 @@ class ItemsController < ApplicationController
   def json_fixture
     [
       {
-        key: "apptastic",
-        title: "Server",
+        key: "root",
+        title: "Apptastic",
         isFolder: true,
         children: [
           {
