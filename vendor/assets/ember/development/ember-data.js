@@ -1,5 +1,5 @@
-// Version: v1.0.0-beta.1-10-g2269671
-// Last commit: 2269671 (2013-09-01 12:24:20 -0700)
+// Version: v1.0.0-beta.1-20-g9596a48
+// Last commit: 9596a48 (2013-09-01 17:51:52 -0700)
 
 
 (function() {
@@ -280,8 +280,8 @@ Ember.Inflector.inflector = new Ember.Inflector(Ember.Inflector.defaultRules);
 
 
 })();
-// Version: v1.0.0-beta.1-10-g2269671
-// Last commit: 2269671 (2013-09-01 12:24:20 -0700)
+// Version: v1.0.0-beta.1-20-g9596a48
+// Last commit: 9596a48 (2013-09-01 17:51:52 -0700)
 
 
 (function() {
@@ -1496,7 +1496,7 @@ DS.Store = Ember.Object.extend(DS._Mappable, {
   defaultAdapter: Ember.computed(function() {
     var adapter = get(this, 'adapter');
 
-    Ember.assert('You tried to set `adapter` property to an instance of `DS.Adapter`, where it should be a name or a factory', !DS.Adapter.detectInstance(adapter));
+    Ember.assert('You tried to set `adapter` property to an instance of `DS.Adapter`, where it should be a name or a factory', !(adapter instanceof DS.Adapter));
 
     if (typeof adapter === 'string') {
       adapter = this.container.lookup('adapter:' + adapter) || this.container.lookup('adapter:application') || this.container.lookup('adapter:_rest');
@@ -2018,6 +2018,8 @@ DS.Store = Ember.Object.extend(DS._Mappable, {
     @return {DS.RecordArray}
   */
   all: function(type) {
+    type = this.modelFor(type);
+
     var typeMap = this.typeMapFor(type),
         findAllCache = typeMap.findAllCache;
 
@@ -2583,12 +2585,6 @@ DS.Store = Ember.Object.extend(DS._Mappable, {
   serializerFor: function(type) {
     var container = this.container;
 
-    // TODO: Make tests pass without this
-
-    if (!container) {
-      return DS.JSONSerializer.create({ store: this });
-    }
-
     return container.lookup('serializer:'+type) ||
            container.lookup('serializer:application') ||
            container.lookup('serializer:_default');
@@ -2969,7 +2965,7 @@ var DirtyState = {
       get(record, 'store').reloadRecord(record, resolver);
     },
 
-    becameClean: function(record) {
+    rolledBack: function(record) {
       record.transitionTo('loaded.saved');
     },
 
@@ -3128,6 +3124,14 @@ var RootState = {
   isDeleted: false,
   isNew: false,
   isValid: true,
+
+  // DEFAULT EVENTS
+
+  // Trying to roll back if you're not in the dirty state
+  // doesn't change your state. For example, if you're in the
+  // in-flight state, rolling back the record doesn't move
+  // you out of the in-flight state.
+  rolledBack: Ember.K,
 
   // SUBSTATES
 
@@ -3292,7 +3296,7 @@ var RootState = {
       becomeDirty: Ember.K,
       deleteRecord: Ember.K,
 
-      becameClean: function(record) {
+      rolledBack: function(record) {
         record.transitionTo('loaded.saved');
       }
     },
@@ -3313,6 +3317,11 @@ var RootState = {
         record.transitionTo('saved');
 
         record.send('invokeLifecycleCallbacks');
+      },
+
+      becameError: function(record) {
+        record.transitionTo('uncommitted');
+        record.triggerLater('becameError', record);
       }
     },
 
@@ -3721,8 +3730,8 @@ DS.Model = Ember.Object.extend(Ember.Evented, {
   },
 
   rollback: function() {
-    this._setup();
-    this.send('becameClean');
+    this._attributes = {};
+    this.send('rolledBack');
 
     this.suspendRelationshipObservers(function() {
       this.notifyPropertyChange('data');
@@ -3953,19 +3962,28 @@ DS.Model.reopen({
   }
 });
 
-function getAttr(record, options, key) {
-  var attributes = get(record, 'data');
-  var value = attributes[key];
-
-  if (value === undefined) {
-    if (typeof options.defaultValue === "function") {
-      value = options.defaultValue();
-    } else {
-      value = options.defaultValue;
-    }
+function getDefaultValue(record, options, key) {
+  if (typeof options.defaultValue === "function") {
+    return options.defaultValue();
+  } else {
+    return options.defaultValue;
   }
+}
 
-  return value;
+function hasValue(record, key) {
+  return record._attributes.hasOwnProperty(key) ||
+         record._inFlightAttributes.hasOwnProperty(key) ||
+         record._data.hasOwnProperty(key);
+}
+
+function getValue(record, key) {
+  if (record._attributes.hasOwnProperty(key)) {
+    return record._attributes[key];
+  } else if (record._inFlightAttributes.hasOwnProperty(key)) {
+    return record._inFlightAttributes[key];
+  } else {
+    return record._data[key];
+  }
 }
 
 DS.attr = function(type, options) {
@@ -3978,17 +3996,19 @@ DS.attr = function(type, options) {
   };
 
   return Ember.computed(function(key, value, oldValue) {
+    var currentValue;
+
     if (arguments.length > 1) {
       Ember.assert("You may not set `id` as an attribute on your model. Please remove any lines that look like: `id: DS.attr('<type>')` from " + this.constructor.toString(), key !== 'id');
       this.send('didSetProperty', { name: key, oldValue: this._attributes[key] || this._inFlightAttributes[key] || this._data[key], value: value });
       this._attributes[key] = value;
-    } else if (this._attributes[key]) {
-      return this._attributes[key];
+      return value;
+    } else if (hasValue(this, key)) {
+      return getValue(this, key);
     } else {
-      value = getAttr(this, options, key);
+      return getDefaultValue(this, options, key);
     }
 
-    return value;
   // `data` is never set directly. However, it may be
   // invalidated from the state manager's setData
   // event.
@@ -4536,7 +4556,7 @@ function asyncBelongsTo(type, options, meta) {
         store = get(this, 'store');
 
     if (arguments.length === 2) {
-      Ember.assert("You can only add a '" + type + "' record to this relationship", !value || store.modelFor(type).detectInstance(value));
+      Ember.assert("You can only add a '" + type + "' record to this relationship", !value || value instanceof store.modelFor(type));
       return value === undefined ? null : value;
     }
 
@@ -4570,7 +4590,7 @@ DS.belongsTo = function(type, options) {
     }
 
     if (arguments.length === 2) {
-      Ember.assert("You can only add a '" + type + "' record to this relationship", !value || typeClass.detectInstance(value));
+      Ember.assert("You can only add a '" + type + "' record to this relationship", !value || value instanceof typeClass);
       return value === undefined ? null : value;
     }
 

@@ -1,3 +1,5 @@
+EmberApp = window.EmberApp
+
 EmberApp.Item = DS.Model.extend
   name: DS.attr 'string'
   description: DS.attr 'string'
@@ -47,3 +49,4 @@ EmberApp.Item.FIXTURES = [
     readOnly: true
   }
 ]
+

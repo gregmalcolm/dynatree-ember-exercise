@@ -1,1 +1,2 @@
-window.EmberApp = Ember.Application.create()
+window.EmberApp = Ember.Application.create
+  LOG_TRANSITIONS: true
