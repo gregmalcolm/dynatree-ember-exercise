@@ -12,6 +12,8 @@
 //
 //= require jquery
 //= require jquery_ujs
+//= require jquery.ui.all
+//= require jquery.dynatree
 //= require handlebars
 //= require ember
 //= require ember-data
